@@ -22,5 +22,9 @@
   {
     "ParameterKey": "DBName2",
     "ParameterValue": "CreditDB"
+  },
+  {
+    "ParameterKey": "EC2SecurityGroup",
+    "ParameterValue": "default"
   }
 ]
