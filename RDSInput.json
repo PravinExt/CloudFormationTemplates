@@ -1,7 +1,7 @@
 [
   {
     "ParameterKey": "DBUser",
-    "ParameterValue": "admin"
+    "ParameterValue": "ExtAdmin"
   },
   {
     "ParameterKey": "DBPassword",
