@@ -26,5 +26,13 @@
   {
     "ParameterKey": "EC2SecurityGroup",
     "ParameterValue": "default"
+  },
+  {
+    "ParameterKey": "paramBucketName",
+    "ParameterValue": "popularbankdemobucket12"
+  },
+   {
+    "ParameterKey": "apiStageName",
+    "ParameterValue": "v1"
   }
 ]
