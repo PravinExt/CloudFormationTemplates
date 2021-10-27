@@ -17,11 +17,11 @@
   },
   {
     "ParameterKey": "DBName1",
-    "ParameterValue": "LoanDB"
+    "ParameterValue": "LoanDataBase"
   },
   {
     "ParameterKey": "DBName2",
-    "ParameterValue": "CreditDB"
+    "ParameterValue": "CreditDataBase"
   },
   {
     "ParameterKey": "EC2SecurityGroup",
