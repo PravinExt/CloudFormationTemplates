@@ -120,7 +120,7 @@ Resources:
             - kms:GenerateDataKeyWithoutPlaintext
             Resource: '*'
 
-  LoanDB:
+  LoanDatabase:
     Type: AWS::RDS::DBInstance
     Properties:
       DBName: !Ref 'DBName1'
@@ -138,7 +138,7 @@ Resources:
         Value: Loan Database
     DeletionPolicy: Snapshot
 
-  CreditDB:
+  CreditDatabase:
     Type: AWS::RDS::DBInstance
     Properties:
       DBName: !Ref 'DBName2'
@@ -149,7 +149,7 @@ Resources:
       MasterUsername: !Ref 'DBUser'
       MasterUserPassword: !Ref 'DBPassword'
       MultiAZ: false
-      StorageEncrypted: true
+      StorageEncrypted: false
       Tags:
       - Key: Name
         Value: Credit Database
