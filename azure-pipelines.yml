@@ -17,7 +17,7 @@ steps:
   inputs:
     awsCredentials: 'awsconnection'
     regionName: 'ap-south-1'
-    stackName: 'RDSEncryption'
+    stackName: 'RDSDBEncryption'
     templateSource: 'file'
     templateFile: 'RDS.yml'
     templateParametersFile: 'RDSInput.json'
