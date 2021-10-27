@@ -146,7 +146,6 @@ Resources:
       DBInstanceClass: !Ref 'DBInstanceClass'
       DBInstanceIdentifier: !Ref 'DBName2'
       Engine: MySQL
-      KmsKeyId: !Ref MyKey
       MasterUsername: !Ref 'DBUser'
       MasterUserPassword: !Ref 'DBPassword'
       MultiAZ: false
@@ -160,3 +159,5 @@ Outputs:
   InstanceId:
     Description: InstanceId of the newly created RDS Instance
     Value: !Ref LoanDB
+   
+   
