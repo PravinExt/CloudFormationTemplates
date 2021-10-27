@@ -156,8 +156,8 @@ Resources:
     DeletionPolicy: Snapshot
 
 Outputs:
-  InstanceId:
-    Description: InstanceId of the newly created RDS Instance
-    Value: !Ref LoanDB
+  Endpoint:
+    Description: endpoint of the newly created RDS Instance
+    Value: !GetAtt CreditDatabase.Endpoint.Address
    
    
