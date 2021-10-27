@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: RDS Storage Encrypted Demo
+Description: RDS Storage Encrypted Demo test
 Parameters:
   
   DBName1:
