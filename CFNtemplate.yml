@@ -1,0 +1,942 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: AWS API Gateway with a Lambda Integration
+
+Parameters:
+  apiStageName:
+    Type: "String"
+    Description: API Staging Name. (Recommend to keep default)
+    Default: "v1"
+
+  paramBucketName:
+    Type: String
+    Description: Bucket Name
+    Default: spbloandoc1
+
+  
+
+Resources:
+  StatesExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - !Sub states.${AWS::Region}.amazonaws.com
+            Action: "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: StatesExecutionPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "lambda:InvokeFunction"
+                Resource: "*"
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+        - PolicyName: allowLambdaLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - logs:*
+              Resource: arn:aws:logs:*:*:*
+        - PolicyName: allowSqs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:GetQueueAttributes
+              - sqs:ChangeMessageVisibility
+              Resource: 
+              - !GetAtt MyQueue1.Arn
+              - !GetAtt MyQueue2.Arn
+
+  
+  LambdaFunction1:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LoantoCreditor
+      Code:
+        S3Bucket: pblambdafunctions
+        S3Key: LoantoCreditor-96f48e5d-ae78-4122-a00c-5187beeb5a76.zip
+      Handler: CreditQueueListener::CreditQueueListener.Function::FunctionHandler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: dotnetcore2.1
+      Timeout: 60
+      MemorySize: 512
+
+  LambdaFunction2:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LoanToDecisionEngine
+      Code:
+        S3Bucket: pblambdafunctions
+        S3Key: LoanToDecisionEngine-640a8f27-a42b-4b9f-a056-bd3c83fd6533.zip
+      Handler: LoanToDecisionEngine::LoanToDecisionEngine.Function::FunctionHandler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: dotnetcore2.1
+      Timeout: 60
+      MemorySize: 512
+
+  LambdaFunction3:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: CreditApproval
+      Code:
+        S3Bucket: pblambdafunctions
+        S3Key: CreditApproval-73b7f84e-44f8-40c9-aa99-f3588bbb3307.zip
+      Handler: CreditApproval::CreditApproval.LambdaEntryPoint::FunctionHandlerAsync
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: dotnetcore2.1
+      Timeout: 60
+      MemorySize: 512 
+
+  LambdaFunction4:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: ApplicationSubmission
+      Code:
+        S3Bucket: pblambdafunctions
+        S3Key: ApplicationSubmission.zip
+      Handler: ApplicationSubmission::ApplicationSubmission.LambdaEntryPoint::FunctionHandlerAsync
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: dotnetcore2.1
+      Timeout: 60
+      MemorySize: 512
+
+  LambdaFunction5:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: LoanApproval
+      Code:
+        S3Bucket: pblambdafunctions
+        S3Key: LoanApproval-2f026896-e1f9-404e-adba-2b86e5029acc.zip
+      Handler: LoanApproval::LoanApproval.LambdaEntryPoint::FunctionHandlerAsync
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: dotnetcore2.1
+      Timeout: 60
+      MemorySize: 512
+
+  LambdaFunctionEventSourceMapping1:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt MyQueue1.Arn
+      FunctionName: !GetAtt LambdaFunction1.Arn
+
+  LambdaFunctionEventSourceMapping2:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      BatchSize: 10
+      Enabled: true
+      EventSourceArn: !GetAtt MyQueue2.Arn
+      FunctionName: !GetAtt LambdaFunction2.Arn
+
+  MyQueue1:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: 'CreditDecision'
+      DelaySeconds: 0
+      VisibilityTimeout: 120
+
+  MyQueue2:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: 'DecisionQueueListener'
+      DelaySeconds: 0
+      VisibilityTimeout: 120
+
+  UserPool1:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: Applicants
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+
+  UserPool2:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: Creditors
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+
+  UserPool3:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: Bankers
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+
+  UserPoolClient1:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: ApplicantsApp
+      GenerateSecret: false
+      UserPoolId: !Ref UserPool1
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+
+  UserPoolClient2:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: BankersApp
+      GenerateSecret: false
+      UserPoolId: !Ref UserPool3
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+
+  UserPoolClient3:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: CreditorsApp
+      GenerateSecret: false
+      UserPoolId: !Ref UserPool2
+      ExplicitAuthFlows:
+        - ADMIN_NO_SRP_AUTH
+
+  S3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: BucketOwnerFullControl
+      BucketName: !Ref paramBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  S3User:
+    Type: AWS::IAM::User
+    Properties:
+      Policies:
+        - PolicyName: bucket-access
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - s3:*
+              Resource:
+                - !Sub arn:aws:s3:::${S3Bucket}
+                - !Sub arn:aws:s3:::${S3Bucket}/*
+  S3UserAccessKey:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref S3User
+
+  ApiGatewayRestApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      ApiKeySourceType: HEADER
+      Description: An API Gateway for Lambda APIs
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+      Name: !Join ["", [{"Ref": "AWS::StackName"}, "-api"]]
+
+  apiResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: "applicationsubmission"
+
+  applicantResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref apiResource
+      PathPart: "applicant"
+
+  apiGatewayMethod1:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: POST
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+      ResourceId: !Ref applicantResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  apiGatewayMethod2:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: GET
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+      ResourceId: !Ref applicantResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ProxyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref applicantResource
+      PathPart: '{proxy+}'
+
+  ProxyResourceANY:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref ProxyResource
+      HttpMethod: ANY
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+
+  businessResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref apiResource
+      PathPart: "business"
+
+  businessApiGatewayMethod1:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: POST
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+      ResourceId: !Ref businessResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  businessApiGatewayMethod2:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: GET
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+      ResourceId: !Ref businessResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  businessProxyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref businessResource
+      PathPart: '{proxy+}'
+
+  businessProxyResourceANY:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref businessProxyResource
+      HttpMethod: ANY
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+
+  documentResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref apiResource
+      PathPart: "document"
+
+  documentApiGatewayMethod1:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: POST
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction45.Arn
+      ResourceId: !Ref documentResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  documentApiGatewayMethod2:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: GET
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+      ResourceId: !Ref documentResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  documentProxyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref documentResource
+      PathPart: '{proxy+}'
+
+  documentProxyResourceANY:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref documentProxyResource
+      HttpMethod: ANY
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+
+  loanResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref apiResource
+      PathPart: "loan"
+
+  loanApiGatewayMethod1:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: POST
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+      ResourceId: !Ref loanResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  loanApiGatewayMethod2:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: GET
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+      ResourceId: !Ref loanResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  loanProxyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref loanResource
+      PathPart: '{proxy+}'
+
+  loanProxyResourceANY:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref loanProxyResource
+      HttpMethod: ANY
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction4.Arn
+
+  creditorApprovalResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: "creditapproval"
+
+  creditResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref creditorApprovalResource
+      PathPart: "creditor"
+
+  creditapiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: GET
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer2
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction3.Arn
+      ResourceId: !Ref creditResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  creditProxyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref creditResource
+      PathPart: '{proxy+}'
+
+  creditProxyResourceANY:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref creditProxyResource
+      HttpMethod: ANY
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer2
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction3.Arn
+  
+  loanApprovalResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: "loanapproval"
+
+  bankerResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref loanApprovalResource
+      PathPart: "banker"
+
+  bankerApiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: GET
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer3
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction5.Arn
+      ResourceId: !Ref bankerResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  bankerProxyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !Ref bankerResource
+      PathPart: '{proxy+}'
+
+  bankerProxyResourceANY:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref bankerProxyResource
+      HttpMethod: ANY
+      AuthorizationScopes: 
+      - 'email'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer3
+      RequestParameters:
+        method.request.path.proxy: true
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
+          - lambdaArn: !GetAtt LambdaFunction5.Arn
+
+  ApiAuthorizer: 
+    Type: "AWS::ApiGateway::Authorizer"
+    Properties: 
+      AuthorizerResultTtlInSeconds: 300
+      IdentitySource: method.request.header.Authorization
+      Name: Applicants
+      ProviderARNs: 
+      - !GetAtt UserPool1.Arn
+      RestApiId: !Ref ApiGatewayRestApi
+      Type: "COGNITO_USER_POOLS"
+
+  ApiAuthorizer2: 
+    Type: "AWS::ApiGateway::Authorizer"
+    Properties: 
+      AuthorizerResultTtlInSeconds: 300
+      IdentitySource: method.request.header.Authorization
+      Name: Creditors
+      ProviderARNs: 
+      - !GetAtt UserPool2.Arn
+      RestApiId: !Ref ApiGatewayRestApi
+      Type: "COGNITO_USER_POOLS"
+
+  ApiAuthorizer3: 
+    Type: "AWS::ApiGateway::Authorizer"
+    Properties: 
+      AuthorizerResultTtlInSeconds: 300
+      IdentitySource: method.request.header.Authorization
+      Name: Bankers
+      ProviderARNs: 
+      - !GetAtt UserPool3.Arn
+      RestApiId: !Ref ApiGatewayRestApi
+      Type: "COGNITO_USER_POOLS"
+
+  ApiGatewayModel:
+    Type: AWS::ApiGateway::Model
+    Properties:
+      ContentType: 'application/json'
+      RestApiId: !Ref ApiGatewayRestApi
+      Schema: {}
+
+  ApiGatewayStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiGatewayDeployment
+      Description: Lambda API Stage v1
+      RestApiId: !Ref ApiGatewayRestApi
+      StageName: !Ref "apiStageName"
+
+  ApiGatewayDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ProxyResourceANY
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayDeployment1:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: businessProxyResourceANY
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayDeployment2:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: documentProxyResourceANY
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayDeployment3:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: loanProxyResourceANY
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayDeployment4:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: creditProxyResourceANY
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayDeployment5:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: bankerProxyResourceANY
+    Properties:
+      Description: Lambda API Deployment
+      RestApiId: !Ref ApiGatewayRestApi
+
+  ApiGatewayIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ''
+            Effect: 'Allow'
+            Principal:
+              Service:
+                - 'apigateway.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Path: '/'
+      Policies:
+        - PolicyName: LambdaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action: 'lambda:*'
+                Resource: 
+                -  !GetAtt LambdaFunction4.Arn
+                -  !GetAtt LambdaFunction3.Arn
+                -  !GetAtt LambdaFunction5.Arn
+                 
+  
+  LambdaPermission1:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt LambdaFunction4.Arn
+      Action: lambda:InvokeFunction
+      Principal: 'apigateway.amazonaws.com'
+
+  LambdaPermission2:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt LambdaFunction3.Arn
+      Action: lambda:InvokeFunction
+      Principal: 'apigateway.amazonaws.com'
+
+  LambdaPermission3:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt LambdaFunction5.Arn
+      Action: lambda:InvokeFunction
+      Principal: 'apigateway.amazonaws.com'
+  
+  
+
+  ApiUsagePlan:
+    Type: "AWS::ApiGateway::UsagePlan"
+    DependsOn: ApiGatewayStage
+    Properties:
+      ApiStages: 
+      - ApiId: !Ref ApiGatewayRestApi
+        Stage: !Ref "apiStageName"    
+      Description: !Join [" ", [{"Ref": "AWS::StackName"}, "usage plan"]]
+      UsagePlanName: !Join ["", [{"Ref": "AWS::StackName"}, "-usage-plan"]]
+
+  MyStateMachine:
+    Type: "AWS::StepFunctions::StateMachine"
+    Properties:
+      StateMachineName: PBLoanProcessOrchestration
+      DefinitionString: |-
+        {
+          "Comment": "This is your state machine",
+          "StartAt": "UpdateLoanStatus",
+          "States": {
+            "UpdateLoanStatus": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.Payload",
+              "Parameters": {
+                "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:UpdateLoanStatus:$LATEST",
+                "Payload.$": "$"
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 6,
+                  "BackoffRate": 2
+                }
+              ],
+              "Next": "Choice"
+            },
+            "Choice": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.LoanApplication_Status",
+                  "NumericEquals": 5,
+                  "Next": "Parallel"
+                },
+                {
+                  "Variable": "$.LoanApplication_Status",
+                  "NumericEquals": 6,
+                  "Next": "DecisionQueueListener"
+                }
+              ],
+              "Default": "Pass"
+            },
+            "Parallel": {
+              "Type": "Parallel",
+              "End": true,
+              "Branches": [
+                {
+                  "StartAt": "OnLoanApprovedByCreditor",
+                  "States": {
+                    "OnLoanApprovedByCreditor": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:states:::lambda:invoke",
+                      "OutputPath": "$.Payload",
+                      "Parameters": {
+                        "Payload.$": "$",
+                        "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:OnLoanApprovedByCreditor:$LATEST"
+                      },
+                      "Retry": [
+                        {
+                          "ErrorEquals": [
+                            "Lambda.ServiceException",
+                            "Lambda.AWSLambdaException",
+                            "Lambda.SdkClientException"
+                          ],
+                          "IntervalSeconds": 2,
+                          "MaxAttempts": 6,
+                          "BackoffRate": 2
+                        }
+                      ],
+                      "End": true
+                    }
+                  }
+                },
+                {
+                  "StartAt": "OnLoanApprovedForExternal",
+                  "States": {
+                    "OnLoanApprovedForExternal": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:states:::lambda:invoke",
+                      "OutputPath": "$.Payload",
+                      "Parameters": {
+                        "Payload.$": "$",
+                        "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:OnLoanApprovedForExternal:$LATEST"
+                      },
+                      "Retry": [
+                        {
+                          "ErrorEquals": [
+                            "Lambda.ServiceException",
+                            "Lambda.AWSLambdaException",
+                            "Lambda.SdkClientException"
+                          ],
+                          "IntervalSeconds": 2,
+                          "MaxAttempts": 6,
+                          "BackoffRate": 2
+                        }
+                      ],
+                      "End": true
+                    }
+                  }
+                }
+              ]
+            },
+            "DecisionQueueListener": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sqs:sendMessage",
+              "Parameters": {
+                "MessageBody.$": "$",
+                "QueueUrl": "https://sqs.ap-south-1.amazonaws.com/618393550001/DecisionQueueListener"
+              },
+              "Next": "Pass"
+            },
+            "Pass": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        }
+      RoleArn: !GetAtt [ StatesExecutionRole, Arn ]
+      
+Outputs:
+  BucketName:
+    Value: !Ref 'S3Bucket'
+    Description: Name of the Amazon S3 bucket.
+  S3BucketSecureURL:
+    Value: !Join ['', ['https://', !GetAtt [S3Bucket, DomainName]]]
+    Description: Domain Name of the Amazon S3 bucket
+  AccessKeyID:
+    Value: !Ref S3UserAccessKey
+  SecretAccessKey:
+    Value: !GetAtt S3UserAccessKey.SecretAccessKey
+  BucketName:
+    Value: !Ref S3Bucket
+  User:
+    Value: !Ref S3User
