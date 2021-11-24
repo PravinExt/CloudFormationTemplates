@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "apiStageName",
+    "ParameterValue": "v1"
+  },
+  {
+    "ParameterKey": "paramBucketName",
+    "ParameterValue": "spbloandoc66"
+  },
+  {
+    "ParameterKey": "CreditApprovalARN",
+    "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:CreditApproval-AspNetCoreFunction-vZZSYMjYUEUy"
+  },
+  {
+    "ParameterKey": "ApplicationSubmissionARN",
+    "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:ApplicationSubmission-AspNetCoreFunction-ymRVHdLBO5Uh"
+  },
+  {
+    "ParameterKey": "LoanApprovalARN",
+    "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:LoanApproval-AspNetCoreFunction-nhJyeydvUIZv"
+  }
+]
