@@ -13,6 +13,18 @@ Parameters:
     Description: Bucket Name
     Default: spbloandoc1
 
+  CreditApprovalARN:
+    Type: String
+    Description: ARN of the CreditApproval Lambda function
+    
+  ApplicationSubmissionARN:
+    Type: String
+    Description: ARN of the ApplicationSubmission Lambda function
+  
+  LoanApprovalARN:
+    Type: String
+    Description: ARN of the LoanApproval Lambda function
+
   
 
 Resources:
@@ -96,45 +108,6 @@ Resources:
         S3Bucket: pblambdafunctions
         S3Key: LoanToDecisionEngine-640a8f27-a42b-4b9f-a056-bd3c83fd6533.zip
       Handler: LoanToDecisionEngine::LoanToDecisionEngine.Function::FunctionHandler
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: dotnetcore2.1
-      Timeout: 60
-      MemorySize: 512
-
-  LambdaFunction3:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: CreditApproval
-      Code:
-        S3Bucket: pblambdafunctions
-        S3Key: CreditApproval-73b7f84e-44f8-40c9-aa99-f3588bbb3307.zip
-      Handler: CreditApproval::CreditApproval.LambdaEntryPoint::FunctionHandlerAsync
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: dotnetcore2.1
-      Timeout: 60
-      MemorySize: 512 
-
-  LambdaFunction4:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: ApplicationSubmission
-      Code:
-        S3Bucket: pblambdafunctions
-        S3Key: ApplicationSubmission.zip
-      Handler: ApplicationSubmission::ApplicationSubmission.LambdaEntryPoint::FunctionHandlerAsync
-      Role: !GetAtt LambdaExecutionRole.Arn
-      Runtime: dotnetcore2.1
-      Timeout: 60
-      MemorySize: 512
-
-  LambdaFunction5:
-    Type: AWS::Lambda::Function
-    Properties:
-      FunctionName: LoanApproval
-      Code:
-        S3Bucket: pblambdafunctions
-        S3Key: LoanApproval-2f026896-e1f9-404e-adba-2b86e5029acc.zip
-      Handler: LoanApproval::LoanApproval.LambdaEntryPoint::FunctionHandlerAsync
       Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: dotnetcore2.1
       Timeout: 60
@@ -289,7 +262,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
       ResourceId: !Ref applicantResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -306,7 +279,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
       ResourceId: !Ref applicantResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -334,7 +307,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
 
   businessResource:
     Type: 'AWS::ApiGateway::Resource'
@@ -356,7 +329,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
       ResourceId: !Ref businessResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -373,7 +346,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
       ResourceId: !Ref businessResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -401,7 +374,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
 
   documentResource:
     Type: 'AWS::ApiGateway::Resource'
@@ -423,7 +396,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction45.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
       ResourceId: !Ref documentResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -440,7 +413,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
       ResourceId: !Ref documentResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -468,7 +441,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
 
   loanResource:
     Type: 'AWS::ApiGateway::Resource'
@@ -490,7 +463,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
       ResourceId: !Ref loanResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -507,7 +480,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
       ResourceId: !Ref loanResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -535,7 +508,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction4.Arn
+          - lambdaArn: !Ref ApplicationSubmissionARN
 
   creditorApprovalResource:
     Type: 'AWS::ApiGateway::Resource'
@@ -564,7 +537,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction3.Arn
+          - lambdaArn: !Ref CreditApprovalARN
       ResourceId: !Ref creditResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -592,7 +565,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction3.Arn
+          - lambdaArn: !Ref CreditApprovalARN
   
   loanApprovalResource:
     Type: 'AWS::ApiGateway::Resource'
@@ -621,7 +594,7 @@ Resources:
         Type: AWS_PROXY
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction5.Arn
+          - lambdaArn: !Ref LoanApprovalARN
       ResourceId: !Ref bankerResource
       RestApiId: !Ref ApiGatewayRestApi
 
@@ -649,7 +622,7 @@ Resources:
         IntegrationHttpMethod: POST
         Uri: !Sub
           - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !GetAtt LambdaFunction5.Arn
+          - lambdaArn: !Ref LoanApprovalARN
 
   ApiAuthorizer: 
     Type: "AWS::ApiGateway::Authorizer"
@@ -763,29 +736,29 @@ Resources:
               - Effect: 'Allow'
                 Action: 'lambda:*'
                 Resource: 
-                -  !GetAtt LambdaFunction4.Arn
-                -  !GetAtt LambdaFunction3.Arn
-                -  !GetAtt LambdaFunction5.Arn
+                -  !Ref ApplicationSubmissionARN
+                -  !Ref CreditApprovalARN
+                -  !Ref LoanApprovalARN
                  
   
   LambdaPermission1:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !GetAtt LambdaFunction4.Arn
+      FunctionName: !Ref ApplicationSubmissionARN
       Action: lambda:InvokeFunction
       Principal: 'apigateway.amazonaws.com'
 
   LambdaPermission2:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !GetAtt LambdaFunction3.Arn
+      FunctionName: !Ref CreditApprovalARN
       Action: lambda:InvokeFunction
       Principal: 'apigateway.amazonaws.com'
 
   LambdaPermission3:
     Type: AWS::Lambda::Permission
     Properties:
-      FunctionName: !GetAtt LambdaFunction5.Arn
+      FunctionName: !Ref LoanApprovalARN
       Action: lambda:InvokeFunction
       Principal: 'apigateway.amazonaws.com'
   
