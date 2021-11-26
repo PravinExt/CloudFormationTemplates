@@ -19,5 +19,5 @@ steps:
     regionName: 'ap-south-1'
     stackName: 'RDSDBEncryption'
     templateSource: 'file'
-    templateFile: 'RDS.yml'
-    templateParametersFile: 'RDSInput.json'
+    templateFile: 'CFNtemplate.yml'
+    templateParametersFile: 'CFNinput.json'
