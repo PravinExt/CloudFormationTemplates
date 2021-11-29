@@ -1,17 +1,11 @@
 AWSTemplateFormatVersion: 2010-09-09
-Description: RDS Storage Encrypted Demo
+Description: RDS Storage Encrypted
 Parameters:
-  
-  DBName1:
-    Description: The database name
+  AvailabilityZone:
+    Description: Availability Zone
     Type: String
-    MinLength: '1'
-    MaxLength: '64'
-    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
-    ConstraintDescription: must begin with a letter and contain only alphanumeric
-      characters.
 
-  DBName2:
+  DBName1:
     Description: The database name
     Type: String
     MinLength: '1'
@@ -51,16 +45,9 @@ Parameters:
       db.m3.2xlarge, db.m4.large, db.m4.xlarge, db.m4.2xlarge, db.m4.4xlarge, db.m4.10xlarge,
       db.r3.large, db.r3.xlarge, db.r3.2xlarge, db.r3.4xlarge, db.r3.8xlarge, db.m2.xlarge,
       db.m2.2xlarge, db.m2.4xlarge, db.cr1.8xlarge, db.t2.micro, db.t2.small, db.t2.medium,
-      db.t2.large]
+      db.t2.large,db.t3.small]
     ConstraintDescription: must select a valid database instance type.
-  EC2SecurityGroup:
-    Description: The EC2 security group that contains instances that need access to
-      the database
-    Default: default
-    Type: String
-    AllowedPattern: '[a-zA-Z0-9\-]+'
-    ConstraintDescription: must be a valid security group name.
-    
+
 Resources:
   MyKey:
     Type: 'AWS::KMS::Key'
@@ -120,13 +107,14 @@ Resources:
             - kms:GenerateDataKeyWithoutPlaintext
             Resource: '*'
 
-  LoanDatabase:
+  LoanDB:
     Type: AWS::RDS::DBInstance
     Properties:
       DBName: !Ref 'DBName1'
       AllocatedStorage: !Ref 'DBAllocatedStorage'
       DBInstanceClass: !Ref 'DBInstanceClass'
       DBInstanceIdentifier: !Ref 'DBName1'
+      AvailabilityZone: !Ref 'AvailabilityZone'
       Engine: MySQL
       KmsKeyId: !Ref MyKey
       MasterUsername: !Ref 'DBUser'
@@ -135,29 +123,16 @@ Resources:
       StorageEncrypted: true
       Tags:
       - Key: Name
-        Value: Loan Database
+        Value: LoanDatabase
     DeletionPolicy: Snapshot
 
-  CreditDatabase:
-    Type: AWS::RDS::DBInstance
-    Properties:
-      DBName: !Ref 'DBName2'
-      AllocatedStorage: !Ref 'DBAllocatedStorage'
-      DBInstanceClass: !Ref 'DBInstanceClass'
-      DBInstanceIdentifier: !Ref 'DBName2'
-      Engine: MySQL
-      MasterUsername: !Ref 'DBUser'
-      MasterUserPassword: !Ref 'DBPassword'
-      MultiAZ: false
-      StorageEncrypted: false
-      Tags:
-      - Key: Name
-        Value: Credit Database
-    DeletionPolicy: Snapshot
+
 
 Outputs:
-  Endpoint:
-    Description: endpoint of the newly created RDS Instance
-    Value: !GetAtt CreditDatabase.Endpoint.Address
-   
-   
+  InstanceId:
+    Description: InstanceId of the newly created RDS Instance
+    Value: !Ref LoanDB
+
+  Endpoint: 
+    Description: Endpoint of the database
+    Value: !GetAtt LoanDB.Endpoint.Address
