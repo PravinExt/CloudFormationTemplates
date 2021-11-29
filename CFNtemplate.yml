@@ -853,15 +853,15 @@ Resources:
                   }
                 },
                 {
-                  "StartAt": "OnLoanApprovedForExternal",
+                  "StartAt": "UpdateLoanStatusByExternal",
                   "States": {
-                    "OnLoanApprovedForExternal": {
+                    "UpdateLoanStatusByExternal": {
                       "Type": "Task",
                       "Resource": "arn:aws:states:::lambda:invoke",
                       "OutputPath": "$.Payload",
                       "Parameters": {
                         "Payload.$": "$",
-                        "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:OnLoanApprovedForExternal:$LATEST"
+                        "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:UpdateLoanStatusByExternal:$LATEST"
                       },
                       "Retry": [
                         {
