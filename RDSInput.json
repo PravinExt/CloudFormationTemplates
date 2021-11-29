@@ -1,5 +1,9 @@
 [
   {
+    "ParameterKey": "AvailabilityZone",
+    "ParameterValue": "ap-south-1b"
+  },
+  {
     "ParameterKey": "DBUser",
     "ParameterValue": "ExtAdmin"
   },
