@@ -28,6 +28,20 @@ Parameters:
   
 
 Resources:
+  ExternalUser:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: ExternalService
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess'
+        - 'arn:aws:iam::aws:policy/AWSCompromisedKeyQuarantineV2'
+
+  CFNKeys:
+    Type: AWS::IAM::AccessKey
+    Properties:
+      UserName: !Ref ExternalUser
+
+
   StatesExecutionRole:
     Type: "AWS::IAM::Role"
     Properties:
@@ -49,6 +63,14 @@ Resources:
                 Action:
                   - "lambda:InvokeFunction"
                 Resource: "*"
+        - PolicyName: sqsfullaccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+             - Effect: Allow
+               Action:
+                - sqs:*
+               Resource: "*"
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -71,6 +93,14 @@ Resources:
               Action:
               - logs:*
               Resource: arn:aws:logs:*:*:*
+        - PolicyName: stepfunctionsfullaccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+             - Effect: Allow
+               Action:
+                - states:*
+               Resource: "*"
         - PolicyName: allowSqs
           PolicyDocument:
             Version: '2012-10-17'
@@ -913,3 +943,9 @@ Outputs:
     Value: !Ref S3Bucket
   User:
     Value: !Ref S3User
+  AccessKey:
+    Value: !Ref 'CFNKeys'
+    Description: AWSAccessKeyId of new user
+  SecretKey:
+    Value: !GetAtt [CFNKeys, SecretAccessKey]
+    Description: AWSSecretAccessKey of new user
