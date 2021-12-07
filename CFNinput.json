@@ -16,7 +16,23 @@
     "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:ApplicationSubmission-AspNetCoreFunction-ymRVHdLBO5Uh"
   },
   {
-    "ParameterKey": "LoanApprovalARN",
-    "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:LoanApproval-AspNetCoreFunction-nhJyeydvUIZv"
+    "ParameterKey": "GetLoanStatusTypeBankerARN",
+    "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:GetLoanStatusTypeBanker"
+  },
+   {
+    "ParameterKey": "GetLoanStatusTypeCreditorARN",
+    "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:GetLoanStatusTypeCreditor"
+  },
+  {
+    "ParameterKey": "LoantoCreditorZipFileName",
+    "ParameterValue": "LoantoCreditor-6403a301-8c94-4d4a-ba86-7f21aee87559.zip"
+  },
+   {
+    "ParameterKey": "LoanToDecisionEngineZipFileName",
+    "ParameterValue": "LoanToDecisionEngine-2faf8bbb-e49a-4829-8fa3-4465135d7ac1.zip"
+  },
+  {
+    "ParameterKey": "pblambdafunctionsbucket",
+    "ParameterValue": "pblambdafunctions"
   }
 ]
