@@ -4,6 +4,16 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: AWS API Gateway with a Lambda Integration
 
 Parameters:
+  AmazonAPIGatewayPushToCloudWatchLogs:
+    Type: String
+    Description: 'ARN of the first IAM Managed Policy to add to the role'
+    Default: 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs'
+
+  AWSStepFunctionsFullAccess:
+    Type: String
+    Description: 'ARN of the second IAM Managed Policy to add to the role'
+    Default: 'arn:aws:iam::aws:policy/AWSStepFunctionsFullAccess'
+
   apiStageName:
     Type: "String"
     Description: API Staging Name. (Recommend to keep default)
@@ -16,6 +26,7 @@ Parameters:
   pblambdafunctionsbucket:
     Type: String
     Description: lambda functions Bucket Name
+    Default: "pblambdafunctions"
 
   LoantoCreditorZipFileName:
     Type: String
@@ -47,6 +58,131 @@ Parameters:
   
 
 Resources:
+
+  MyStateMachine:
+    Type: "AWS::StepFunctions::StateMachine"
+    Properties:
+      StateMachineName: PBLoanProcessOrchestration
+      DefinitionString: |-
+        {
+          "Comment": "This is your state machine",
+          "StartAt": "UpdateLoanStatus",
+          "States": {
+            "UpdateLoanStatus": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "OutputPath": "$.Payload",
+              "Parameters": {
+                "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:UpdateLoanStatus:$LATEST",
+                "Payload.$": "$"
+              },
+              "Retry": [
+                {
+                  "ErrorEquals": [
+                    "Lambda.ServiceException",
+                    "Lambda.AWSLambdaException",
+                    "Lambda.SdkClientException"
+                  ],
+                  "IntervalSeconds": 2,
+                  "MaxAttempts": 6,
+                  "BackoffRate": 2
+                }
+              ],
+              "Next": "Choice"
+            },
+            "Choice": {
+              "Type": "Choice",
+              "Choices": [
+                {
+                  "Variable": "$.LoanApplication_Status",
+                  "NumericEquals": 5,
+                  "Next": "Parallel"
+                },
+                {
+                  "Variable": "$.LoanApplication_Status",
+                  "NumericEquals": 6,
+                  "Next": "DecisionQueueListener"
+                }
+              ],
+              "Default": "Pass"
+            },
+            "Parallel": {
+              "Type": "Parallel",
+              "End": true,
+              "Branches": [
+                {
+                  "StartAt": "OnLoanApprovedByCreditor",
+                  "States": {
+                    "OnLoanApprovedByCreditor": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:states:::lambda:invoke",
+                      "OutputPath": "$.Payload",
+                      "Parameters": {
+                        "Payload.$": "$",
+                        "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:OnLoanApprovedByCreditor:$LATEST"
+                      },
+                      "Retry": [
+                        {
+                          "ErrorEquals": [
+                            "Lambda.ServiceException",
+                            "Lambda.AWSLambdaException",
+                            "Lambda.SdkClientException"
+                          ],
+                          "IntervalSeconds": 2,
+                          "MaxAttempts": 6,
+                          "BackoffRate": 2
+                        }
+                      ],
+                      "End": true
+                    }
+                  }
+                },
+                {
+                  "StartAt": "UpdateLoanStatusByExternal",
+                  "States": {
+                    "UpdateLoanStatusByExternal": {
+                      "Type": "Task",
+                      "Resource": "arn:aws:states:::lambda:invoke",
+                      "OutputPath": "$.Payload",
+                      "Parameters": {
+                        "Payload.$": "$",
+                        "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:UpdateLoanStatusByExternal:$LATEST"
+                      },
+                      "Retry": [
+                        {
+                          "ErrorEquals": [
+                            "Lambda.ServiceException",
+                            "Lambda.AWSLambdaException",
+                            "Lambda.SdkClientException"
+                          ],
+                          "IntervalSeconds": 2,
+                          "MaxAttempts": 6,
+                          "BackoffRate": 2
+                        }
+                      ],
+                      "End": true
+                    }
+                  }
+                }
+              ]
+            },
+            "DecisionQueueListener": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::sqs:sendMessage",
+              "Parameters": {
+                "MessageBody.$": "$",
+                "QueueUrl": "https://sqs.ap-south-1.amazonaws.com/618393550001/DecisionQueueListener"
+              },
+              "Next": "Pass"
+            },
+            "Pass": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        }
+      RoleArn: !GetAtt [ StatesExecutionRole, Arn ]
+
   ExternalUser:
     Type: 'AWS::IAM::User'
     Properties:
@@ -59,7 +195,6 @@ Resources:
     Type: AWS::IAM::AccessKey
     Properties:
       UserName: !Ref ExternalUser
-
 
   StatesExecutionRole:
     Type: "AWS::IAM::Role"
@@ -90,6 +225,22 @@ Resources:
                Action:
                 - sqs:*
                Resource: "*"
+
+  APIGatewayToStepFunctionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+        - !Ref AmazonAPIGatewayPushToCloudWatchLogs
+        - !Ref AWSStepFunctionsFullAccess
 
   LambdaExecutionRole:
     Type: AWS::IAM::Role
@@ -231,18 +382,18 @@ Resources:
   UserPoolClient2:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: BankersApp
+      ClientName: CreditorsApp
       GenerateSecret: false
-      UserPoolId: !Ref UserPool3
+      UserPoolId: !Ref UserPool2
       ExplicitAuthFlows:
         - ADMIN_NO_SRP_AUTH
 
   UserPoolClient3:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: CreditorsApp
+      ClientName: BankersApp
       GenerateSecret: false
-      UserPoolId: !Ref UserPool2
+      UserPoolId: !Ref UserPool3
       ExplicitAuthFlows:
         - ADMIN_NO_SRP_AUTH
 
@@ -1134,6 +1285,85 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
+  executionResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      RestApiId: !Ref ApiGatewayRestApi
+      ParentId: !GetAtt ApiGatewayRestApi.RootResourceId
+      PathPart: "execution"
+
+  executionapiGatewayMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      HttpMethod: POST
+      AuthorizationScopes: 
+      - 'email'
+      - 'openid'
+      - 'aws.cognito.signin.user.admin'
+      AuthorizationType: COGNITO_USER_POOLS
+      AuthorizerId: !Ref ApiAuthorizer2
+      Integration:
+        Type: AWS
+        IntegrationHttpMethod: POST
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS,GET'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        Uri: !Sub "arn:aws:apigateway:${AWS::Region}:states:action/StartExecution"
+        Credentials: !GetAtt APIGatewayToStepFunctionsRole.Arn
+        RequestTemplates:
+          application/json:
+            !Sub
+            - |-
+              {
+                "input": "$util.escapeJavaScript($input.json('$'))",
+                "stateMachineArn": "${StepMachineArn}"
+              }
+            - StepMachineArn: !Ref MyStateMachine
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+      ResourceId: !Ref executionResource
+      RestApiId: !Ref ApiGatewayRestApi
+
+  executionOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      RestApiId: !Ref ApiGatewayRestApi
+      ResourceId: !Ref executionResource
+      HttpMethod: OPTIONS
+      Integration:
+        IntegrationResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS,GET'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+          ResponseTemplates:
+            application/json: ''
+        PassthroughBehavior: WHEN_NO_MATCH
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: MOCK
+      MethodResponses:
+      - StatusCode: 200
+        ResponseModels:
+          application/json: 'Empty'
+        ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
   getloanstatustypebankerResource:
     Type: 'AWS::ApiGateway::Resource'
     Properties:
@@ -1176,58 +1406,6 @@ Resources:
       AuthorizationType: NONE
       RestApiId: !Ref ApiGatewayRestApi
       ResourceId: !Ref loanstatusbankerResource
-      HttpMethod: OPTIONS
-      Integration:
-        IntegrationResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS,GET'"
-            method.response.header.Access-Control-Allow-Origin: "'*'"
-          ResponseTemplates:
-            application/json: ''
-        PassthroughBehavior: WHEN_NO_MATCH
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-        Type: MOCK
-      MethodResponses:
-      - StatusCode: 200
-        ResponseModels:
-          application/json: 'Empty'
-        ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
-
-  loanstatusbankerProxyResource:
-    Type: 'AWS::ApiGateway::Resource'
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ParentId: !Ref loanstatusbankerResource
-      PathPart: '{proxy+}'
-
-  loanstatusbankerProxyResourceANY:
-    Type: 'AWS::ApiGateway::Method'
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref loanstatusbankerProxyResource
-      HttpMethod: ANY
-      AuthorizationType: NONE
-      RequestParameters:
-        method.request.path.proxy: true
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub
-          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !Ref GetLoanStatusTypeBankerARN
-
-  loanstatusbankerOptionsProxyMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      AuthorizationType: NONE
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref loanstatusbankerProxyResource
       HttpMethod: OPTIONS
       Integration:
         IntegrationResponses:
@@ -1316,57 +1494,6 @@ Resources:
             method.response.header.Access-Control-Allow-Methods: true
             method.response.header.Access-Control-Allow-Origin: true
 
-  loanstatuscreditorProxyResource:
-    Type: 'AWS::ApiGateway::Resource'
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ParentId: !Ref loanstatuscreditorResource
-      PathPart: '{proxy+}'
-
-  loanstatuscreditorProxyResourceANY:
-    Type: 'AWS::ApiGateway::Method'
-    Properties:
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref loanstatuscreditorProxyResource
-      HttpMethod: ANY
-      AuthorizationType: NONE
-      RequestParameters:
-        method.request.path.proxy: true
-      Integration:
-        Type: AWS_PROXY
-        IntegrationHttpMethod: POST
-        Uri: !Sub
-          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${lambdaArn}/invocations
-          - lambdaArn: !Ref GetLoanStatusTypeCreditorARN
-
-  loanstatuscreditorOptionsProxyMethod:
-    Type: AWS::ApiGateway::Method
-    Properties:
-      AuthorizationType: NONE
-      RestApiId: !Ref ApiGatewayRestApi
-      ResourceId: !Ref loanstatuscreditorProxyResource
-      HttpMethod: OPTIONS
-      Integration:
-        IntegrationResponses:
-        - StatusCode: 200
-          ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS,GET'"
-            method.response.header.Access-Control-Allow-Origin: "'*'"
-          ResponseTemplates:
-            application/json: ''
-        PassthroughBehavior: WHEN_NO_MATCH
-        RequestTemplates:
-          application/json: '{"statusCode": 200}'
-        Type: MOCK
-      MethodResponses:
-      - StatusCode: 200
-        ResponseModels:
-          application/json: 'Empty'
-        ResponseParameters:
-            method.response.header.Access-Control-Allow-Headers: true
-            method.response.header.Access-Control-Allow-Methods: true
-            method.response.header.Access-Control-Allow-Origin: true
 
   ApiAuthorizer: 
     Type: "AWS::ApiGateway::Authorizer"
@@ -1423,48 +1550,6 @@ Resources:
       Description: Lambda API Deployment
       RestApiId: !Ref ApiGatewayRestApi
 
-  ApiGatewayDeployment1:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: businessProxyResourceANY
-    Properties:
-      Description: Lambda API Deployment
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayDeployment2:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: documentProxyResourceANY
-    Properties:
-      Description: Lambda API Deployment
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayDeployment3:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: loanProxyResourceANY
-    Properties:
-      Description: Lambda API Deployment
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayDeployment4:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: creditProxyResourceANY
-    Properties:
-      Description: Lambda API Deployment
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayDeployment5:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: loanstatusbankerProxyResourceANY
-    Properties:
-      Description: Lambda API Deployment
-      RestApiId: !Ref ApiGatewayRestApi
-
-  ApiGatewayDeployment6:
-    Type: AWS::ApiGateway::Deployment
-    DependsOn: loanstatuscreditorProxyResourceANY
-    Properties:
-      Description: Lambda API Deployment
-      RestApiId: !Ref ApiGatewayRestApi
-
   ApiGatewayIamRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1490,6 +1575,8 @@ Resources:
                 -  !Ref ApplicationSubmissionARN
                 -  !Ref CreditApprovalARN
                 -  !Ref LoanApprovalARN
+                -  !Ref GetLoanStatusTypeBankerARN
+                -  !Ref GetLoanStatusTypeCreditorARN
                  
   
   LambdaPermission1:
@@ -1513,7 +1600,19 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: 'apigateway.amazonaws.com'
   
-  
+  LambdaPermission4:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetLoanStatusTypeBankerARN
+      Action: lambda:InvokeFunction
+      Principal: 'apigateway.amazonaws.com'
+
+  LambdaPermission5:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GetLoanStatusTypeCreditorARN
+      Action: lambda:InvokeFunction
+      Principal: 'apigateway.amazonaws.com'
 
   ApiUsagePlan:
     Type: "AWS::ApiGateway::UsagePlan"
@@ -1525,129 +1624,7 @@ Resources:
       Description: !Join [" ", [{"Ref": "AWS::StackName"}, "usage plan"]]
       UsagePlanName: !Join ["", [{"Ref": "AWS::StackName"}, "-usage-plan"]]
 
-  MyStateMachine:
-    Type: "AWS::StepFunctions::StateMachine"
-    Properties:
-      StateMachineName: PBLoanProcessOrchestration
-      DefinitionString: |-
-        {
-          "Comment": "This is your state machine",
-          "StartAt": "UpdateLoanStatus",
-          "States": {
-            "UpdateLoanStatus": {
-              "Type": "Task",
-              "Resource": "arn:aws:states:::lambda:invoke",
-              "OutputPath": "$.Payload",
-              "Parameters": {
-                "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:UpdateLoanStatus:$LATEST",
-                "Payload.$": "$"
-              },
-              "Retry": [
-                {
-                  "ErrorEquals": [
-                    "Lambda.ServiceException",
-                    "Lambda.AWSLambdaException",
-                    "Lambda.SdkClientException"
-                  ],
-                  "IntervalSeconds": 2,
-                  "MaxAttempts": 6,
-                  "BackoffRate": 2
-                }
-              ],
-              "Next": "Choice"
-            },
-            "Choice": {
-              "Type": "Choice",
-              "Choices": [
-                {
-                  "Variable": "$.LoanApplication_Status",
-                  "NumericEquals": 5,
-                  "Next": "Parallel"
-                },
-                {
-                  "Variable": "$.LoanApplication_Status",
-                  "NumericEquals": 6,
-                  "Next": "DecisionQueueListener"
-                }
-              ],
-              "Default": "Pass"
-            },
-            "Parallel": {
-              "Type": "Parallel",
-              "End": true,
-              "Branches": [
-                {
-                  "StartAt": "OnLoanApprovedByCreditor",
-                  "States": {
-                    "OnLoanApprovedByCreditor": {
-                      "Type": "Task",
-                      "Resource": "arn:aws:states:::lambda:invoke",
-                      "OutputPath": "$.Payload",
-                      "Parameters": {
-                        "Payload.$": "$",
-                        "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:OnLoanApprovedByCreditor:$LATEST"
-                      },
-                      "Retry": [
-                        {
-                          "ErrorEquals": [
-                            "Lambda.ServiceException",
-                            "Lambda.AWSLambdaException",
-                            "Lambda.SdkClientException"
-                          ],
-                          "IntervalSeconds": 2,
-                          "MaxAttempts": 6,
-                          "BackoffRate": 2
-                        }
-                      ],
-                      "End": true
-                    }
-                  }
-                },
-                {
-                  "StartAt": "UpdateLoanStatusByExternal",
-                  "States": {
-                    "UpdateLoanStatusByExternal": {
-                      "Type": "Task",
-                      "Resource": "arn:aws:states:::lambda:invoke",
-                      "OutputPath": "$.Payload",
-                      "Parameters": {
-                        "Payload.$": "$",
-                        "FunctionName": "arn:aws:lambda:ap-south-1:618393550001:function:UpdateLoanStatusByExternal:$LATEST"
-                      },
-                      "Retry": [
-                        {
-                          "ErrorEquals": [
-                            "Lambda.ServiceException",
-                            "Lambda.AWSLambdaException",
-                            "Lambda.SdkClientException"
-                          ],
-                          "IntervalSeconds": 2,
-                          "MaxAttempts": 6,
-                          "BackoffRate": 2
-                        }
-                      ],
-                      "End": true
-                    }
-                  }
-                }
-              ]
-            },
-            "DecisionQueueListener": {
-              "Type": "Task",
-              "Resource": "arn:aws:states:::sqs:sendMessage",
-              "Parameters": {
-                "MessageBody.$": "$",
-                "QueueUrl": "https://sqs.ap-south-1.amazonaws.com/618393550001/DecisionQueueListener"
-              },
-              "Next": "Pass"
-            },
-            "Pass": {
-              "Type": "Pass",
-              "End": true
-            }
-          }
-        }
-      RoleArn: !GetAtt [ StatesExecutionRole, Arn ]
+  
       
 Outputs:
   BucketName:
@@ -1670,3 +1647,17 @@ Outputs:
   SecretKey:
     Value: !GetAtt [CFNKeys, SecretAccessKey]
     Description: AWSSecretAccessKey of new user
+  ApplicantUserPoolID:
+    Value: !Ref UserPool1
+  ApplicantUserPoolClientID:
+    Value: !Ref UserPoolClient1
+  CreditorsUserPoolID:
+    Value: !Ref UserPool2
+  CreditorsUserPoolClientID:
+    Value: !Ref UserPoolClient2
+  BankersUserPoolID:
+    Value: !Ref UserPool3
+  BankersUserPoolClientID:
+    Value: !Ref UserPoolClient3
+  MyStateMachineARN:
+    Value: !Ref MyStateMachine
