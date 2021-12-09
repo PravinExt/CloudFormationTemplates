@@ -34,13 +34,5 @@
   {
     "ParameterKey": "pblambdafunctionsbucket",
     "ParameterValue": "pblambdafunctions"
-  },
-  {
-    "ParameterKey": "CreditApprovalRoleARN",
-    "ParameterValue": "arn:aws:iam::618393550001:role/CreditApproval-AspNetCoreFunctionRole-1NFV64D6IEV1V"
-  },
-  {
-    "ParameterKey": "LoanApprovalRoleARN",
-    "ParameterValue": "arn:aws:iam::618393550001:role/LoanApproval-AspNetCoreFunctionRole-E3CSEZPL22KN"
   }
 ]
