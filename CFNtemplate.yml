@@ -55,7 +55,14 @@ Parameters:
   GetLoanStatusTypeCreditorARN:
     Type: String
     Description: ARN of the GetLoanStatusTypeCreditor Lambda function
-  
+
+  CreditApprovalRoleARN:
+    Type: String
+    Description: ARN of the Credit Approval Role
+
+  LoanApprovalRoleARN:
+    Type: String
+    Description: ARN of the Loan Approval Role
 
 Resources:
 
@@ -195,6 +202,21 @@ Resources:
     Type: AWS::IAM::AccessKey
     Properties:
       UserName: !Ref ExternalUser
+
+  sqspolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+    PolicyName: updatesqspolicy
+    PolicyDocument:
+      Version: "2012-10-17"
+      Statement:
+       - Effect: Allow
+         Action:
+          - sqs:*
+         Resource: "*"
+    Roles:
+      - !Ref CreditApprovalRoleARN
+      - !Ref LoanApprovalRoleARN
 
   StatesExecutionRole:
     Type: "AWS::IAM::Role"
