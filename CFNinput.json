@@ -40,7 +40,7 @@
     "ParameterValue": "pblambdafunctions"
   },
   {
-    "ParameterKey": " CreditApprovalRole",
+    "ParameterKey": "CreditApprovalRole",
     "ParameterValue": "CreditApproval-AspNetCoreFunctionRole-1NFV64D6IEV1V"
   },
   {
