@@ -18,7 +18,15 @@ steps:
     awsCredentials: 'awsconnection'
     regionName: 'ap-south-1'
     bucketName: 'pblambdafunctions'
-    globExpressions: '**/CFNtemplate.yml, **/CFNinput.json'
+    globExpressions: '**/CFNtemplate.yml'
+  
+- task: S3Upload@1
+  inputs:
+    awsCredentials: 'awsconnection'
+    regionName: 'ap-south-1'
+    bucketName: 'pblambdafunctions'
+    globExpressions: '**/CFNinput.json'
+
 
 - task: CloudFormationCreateOrUpdateStack@1
   inputs:
