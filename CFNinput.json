@@ -11,6 +11,10 @@
     "ParameterKey": "CreditApprovalARN",
     "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:CreditApproval-AspNetCoreFunction-vZZSYMjYUEUy"
   },
+   {
+    "ParameterKey": "LoanApprovalARN",
+    "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:LoanApproval-AspNetCoreFunction-nhJyeydvUIZv"
+  },
   {
     "ParameterKey": "ApplicationSubmissionARN",
     "ParameterValue": "arn:aws:lambda:ap-south-1:618393550001:function:ApplicationSubmission-AspNetCoreFunction-ymRVHdLBO5Uh"
@@ -34,5 +38,13 @@
   {
     "ParameterKey": "pblambdafunctionsbucket",
     "ParameterValue": "pblambdafunctions"
+  },
+  {
+    "ParameterKey": " CreditApprovalRole",
+    "ParameterValue": "CreditApproval-AspNetCoreFunctionRole-1NFV64D6IEV1V"
+  },
+  {
+    "ParameterKey": "LoanApprovalRole",
+    "ParameterValue": "LoanApproval-AspNetCoreFunctionRole-E3CSEZPL22KNs"
   }
 ]
