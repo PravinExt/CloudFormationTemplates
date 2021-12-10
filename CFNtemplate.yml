@@ -57,11 +57,11 @@ Parameters:
   
   CreditApprovalRole:
     Type: String
-    Description: ARN of the GetLoanStatusTypeBanker Lambda function
-
+    Description:  CreditApproval Lambda Function Role
+    
   LoanApprovalRole:
     Type: String
-    Description: ARN of the GetLoanStatusTypeCreditor Lambda function
+    Description: LoanApproval Lambda Function Role
 
 Resources:
 
