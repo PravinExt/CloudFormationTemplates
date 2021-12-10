@@ -13,11 +13,19 @@ steps:
 - script: echo Hello, world!
   displayName: 'Creating cloudformation stack'
 
+- task: S3Upload@1
+  inputs:
+    awsCredentials: 'awsconnection'
+    regionName: 'ap-south-1'
+    bucketName: 'pblambdafunctions'
+    globExpressions: '**/CFNtemplate.yml, **/CFNinput.json'
+
 - task: CloudFormationCreateOrUpdateStack@1
   inputs:
     awsCredentials: 'awsconnection'
     regionName: 'ap-south-1'
-    stackName: 'RDSDBEncryption'
-    templateSource: 'file'
-    templateFile: 'CFNtemplate.yml'
+    stackName: 'CFNStack'
+    templateSource: 's3'
+    s3BucketName: 'pblambdafunctions'
+    s3ObjectKey: 'CFNtemplate.yml'
     templateParametersFile: 'CFNinput.json'
