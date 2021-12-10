@@ -26,7 +26,6 @@ Parameters:
   pblambdafunctionsbucket:
     Type: String
     Description: lambda functions Bucket Name
-    Default: "pblambdafunctions"
 
   LoantoCreditorZipFileName:
     Type: String
@@ -47,12 +46,20 @@ Parameters:
   LoanApprovalARN:
     Type: String
     Description: ARN of the LoanApproval Lambda function
-
+ 
   GetLoanStatusTypeBankerARN:
     Type: String
     Description: ARN of the GetLoanStatusTypeBanker Lambda function
 
   GetLoanStatusTypeCreditorARN:
+    Type: String
+    Description: ARN of the GetLoanStatusTypeCreditor Lambda function
+  
+  CreditApprovalRole:
+    Type: String
+    Description: ARN of the GetLoanStatusTypeBanker Lambda function
+
+  LoanApprovalRole:
     Type: String
     Description: ARN of the GetLoanStatusTypeCreditor Lambda function
 
@@ -224,6 +231,22 @@ Resources:
                Action:
                 - sqs:*
                Resource: "*"
+
+  sqspolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: updatesqspolicy
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Action:
+            - sqs:*
+            - s3:*
+          Resource: "*"
+      Roles:
+        - !Ref CreditApprovalRole
+        - !Ref LoanApprovalRole
 
   APIGatewayToStepFunctionsRole:
     Type: AWS::IAM::Role
